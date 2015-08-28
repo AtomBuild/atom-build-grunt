@@ -79,4 +79,26 @@ describe('grunt provider', function() {
       expect(workspaceElement.querySelector('.build .output').textContent).toMatch(/^Executing: grunt/);
     });
   });
+
+  it('should list Grunt targets in a SelectListView', function () {
+    waitsForPromise(setupGrunt);
+    fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/Gruntfile.js'));
+
+    runs(function () {
+      atom.commands.dispatch(workspaceElement, 'build:select-active-target');
+    });
+
+    waitsFor(function () {
+      return workspaceElement.querySelector('.select-list li.build-target');
+    });
+
+    runs(function () {
+      var list = workspaceElement.querySelectorAll('.select-list li.build-target');
+      var targets = Array.prototype.slice.call(list).map(function (el) {
+        return el.textContent;
+      });
+      expect(targets).toEqual([ 'Grunt: default', 'Grunt: dev task', 'Grunt: other task', ]);
+    });
+  });
+
 });
