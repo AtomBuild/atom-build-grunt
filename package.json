@@ -1,0 +1,36 @@
+{
+  "name": "build-grunt",
+  "version": "0.1.0",
+  "description": "Runs grunt targets",
+  "repository": "https://github.com/noseglid/atom-build-grunt",
+  "license": "MIT",
+  "engines": {
+    "atom": ">=0.50.0"
+  },
+  "providedServices": {
+    "builder": {
+      "description": "Runs Grunt targets",
+      "versions": {
+        "1.0.0": "provideBuilder"
+      }
+    }
+  },
+  "devDependencies": {
+    "temp": "^0.8.3",
+    "fs-extra": "^0.23.1",
+    "atom-build-spec-helpers": "^0.1.0",
+    "jshint": "^2.5.11",
+    "jscs": "^1.9.0"
+  },
+  "scripts": {
+    "test": "jscs lib/*.js spec/*-spec.js && jshint lib/*.js spec/*-spec.js"
+  },
+  "keywords": [
+    "build",
+    "compile",
+    "Grunt",
+    "productivity"
+  ],
+
+  "main": "lib/Grunt.js"
+}
