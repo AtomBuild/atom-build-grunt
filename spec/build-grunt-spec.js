@@ -45,6 +45,10 @@ describe('grunt provider', function() {
     });
   });
 
+  afterEach(function() {
+    fs.removeSync(directory);
+  });
+
   it('should show the build panel if a Gruntfile exists', function() {
     expect(workspaceElement.querySelector('.build')).not.toExist();
 
