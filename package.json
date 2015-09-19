@@ -1,6 +1,6 @@
 {
   "name": "build-grunt",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Runs grunt targets",
   "repository": "https://github.com/noseglid/atom-build-grunt",
   "license": "MIT",
@@ -32,6 +32,5 @@
     "javascript",
     "productivity"
   ],
-
   "main": "lib/Grunt.js"
 }
