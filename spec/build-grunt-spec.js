@@ -1,127 +1,82 @@
-'use strict';
+'use babel';
 
-var temp = require('temp');
-var path = require('path');
-var fs = require('fs-extra');
-var specHelpers = require('atom-build-spec-helpers');
+import temp from 'temp';
+import path from 'path';
+import fs from 'fs-extra';
+import { vouch } from 'atom-build-spec-helpers';
+import { provideBuilder } from '../lib/grunt';
 
-describe('grunt provider', function() {
-  var directory;
-  var workspaceElement;
+describe('grunt provider', () => {
+  let directory;
+  const builder = provideBuilder();
 
-  var setupGrunt = function () {
-    var binGrunt = path.join(directory, 'node_modules', '.bin', 'grunt');
-    var realGrunt = path.join(directory, 'node_modules', 'grunt-cli', 'bin', 'grunt');
-    var source = path.join(__dirname, 'node_modules');
-    var target = path.join(directory, 'node_modules');
-    return specHelpers.vouch(fs.copy, source, target).then(function () {
+  const setupGrunt = () => {
+    const binGrunt = path.join(directory, 'node_modules', '.bin', 'grunt');
+    const realGrunt = path.join(directory, 'node_modules', 'grunt-cli', 'bin', 'grunt');
+    const source = path.join(__dirname, 'fixture/node_modules');
+    const target = path.join(directory, 'node_modules');
+    return vouch(fs.copy, source, target).then(() => {
       return Promise.all([
-        specHelpers.vouch(fs.unlink, binGrunt),
-        specHelpers.vouch(fs.chmod, realGrunt, parseInt('0700', 8))
+        vouch(fs.unlink, binGrunt),
+        vouch(fs.chmod, realGrunt, parseInt('0700', 8))
       ]);
-    }).then(function () {
-      return specHelpers.vouch(fs.symlink, realGrunt, binGrunt);
-    });
+    }).then(() => vouch(fs.symlink, realGrunt, binGrunt));
   };
 
-  beforeEach(function () {
-    workspaceElement = atom.views.getView(atom.workspace);
-    jasmine.attachToDOM(workspaceElement);
-    jasmine.unspy(window, 'setTimeout');
-    jasmine.unspy(window, 'clearTimeout');
-
-    waitsForPromise(function() {
-      return specHelpers.vouch(temp.mkdir, 'atom-build-spec-').then(function (dir) {
-        return specHelpers.vouch(fs.realpath, dir);
-      }).then(function (dir) {
-        directory = dir + '/';
-        atom.project.setPaths([ directory ]);
-      }).then(function () {
-        return Promise.all([
-          atom.packages.activatePackage('build'),
-          atom.packages.activatePackage('build-grunt')
-        ]);
-      });
+  beforeEach(() => {
+    waitsForPromise(() => {
+      return vouch(temp.mkdir, 'atom-build-spec-')
+        .then((dir) => vouch(fs.realpath, dir))
+        .then((dir) => (directory = `${dir}/`));
     });
   });
 
-  afterEach(function() {
+  afterEach(() => {
     fs.removeSync(directory);
   });
 
-  it('should show the build panel if a Gruntfile exists', function() {
-    expect(workspaceElement.querySelector('.build')).not.toExist();
-
-    waitsForPromise(setupGrunt);
-
-    runs(function () {
-      fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/Gruntfile.js'));
-      atom.commands.dispatch(workspaceElement, 'build:trigger');
-    });
-
-    waitsFor(function() {
-      return workspaceElement.querySelector('.build .title') &&
-        workspaceElement.querySelector('.build .title').classList.contains('success');
-    });
-
-    runs(function() {
-      expect(workspaceElement.querySelector('.build')).toExist();
-      expect(workspaceElement.querySelector('.build .output').textContent).toMatch(/Surprising is the passing of time. But not so, as the time of passing/);
-    });
-  });
-
-  it('should run default target if grunt is not installed', function () {
-    fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/Gruntfile.js'));
-    atom.commands.dispatch(workspaceElement, 'build:trigger');
-
-    waitsFor(function() {
-      return workspaceElement.querySelector('.build .title') &&
-        workspaceElement.querySelector('.build .title').classList.contains('error');
-    });
-
-    runs(function() {
-      expect(workspaceElement.querySelector('.build .output').textContent).toMatch(/^Executing: grunt/);
-    });
-  });
-
-  it('should list Grunt targets in a SelectListView', function () {
-    waitsForPromise(setupGrunt);
-    fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/Gruntfile.js'));
-
-    runs(function () {
-      atom.commands.dispatch(workspaceElement, 'build:select-active-target');
-    });
-
-    waitsFor(function () {
-      return workspaceElement.querySelector('.select-list li.build-target');
-    });
-
-    runs(function () {
-      var list = workspaceElement.querySelectorAll('.select-list li.build-target');
-      var targets = Array.prototype.slice.call(list).map(function (el) {
-        return el.textContent;
+  describe('when gruntfile exists', () => {
+    it('should be eligible', () => {
+      fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/fixture/Gruntfile.js'));
+      waitsForPromise(setupGrunt);
+      runs(() => {
+        expect(builder.isEligable(directory)).toBe(true);
       });
-      expect(targets).toEqual([ 'Grunt: default', 'Grunt: dev task', 'Grunt: other task', ]);
+    });
+
+    it('should give targets as settings', () => {
+      fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/fixture/Gruntfile.js'));
+      waitsForPromise(setupGrunt);
+      waitsForPromise(() => {
+        return builder.settings(directory).then((settings) => {
+          expect(settings.length).toBe(3);
+          const real = settings.map(s => s.name).sort();
+          const expected = [ 'Grunt: default', 'Grunt: dev task', 'Grunt: other task' ];
+          expect(real).toEqual(expected);
+
+          // Inspect one target closely
+          const setting = settings.find(s => s.name === 'Grunt: dev task');
+          expect(setting.sh).toBe(false);
+          expect(setting.args).toEqual([ 'dev task' ]);
+          expect(setting.exec).toEqual(`${directory}node_modules/.bin/grunt`);
+        });
+      });
+    });
+
+    it('should only contain default target if grunt is not installed', () => {
+      fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/fixture/Gruntfile.js'));
+      runs(() => {
+        builder.settings(directory).then((settings) => {
+          expect(settings.length).toBe(1);
+          expect(settings[0].name).toEqual('Grunt: default');
+        });
+      });
     });
   });
 
-  it('should still list the default target for Grunt if it is unable to extract targets', function () {
-    fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/Gruntfile.js'));
-
-    runs(function () {
-      atom.commands.dispatch(workspaceElement, 'build:select-active-target');
-    });
-
-    waitsFor(function () {
-      return workspaceElement.querySelector('.select-list li.build-target');
-    });
-
-    runs(function () {
-      var list = workspaceElement.querySelectorAll('.select-list li.build-target');
-      var targets = Array.prototype.slice.call(list).map(function (el) {
-        return el.textContent;
-      });
-      expect(targets).toEqual([ 'Grunt: default' ]);
+  describe('when gruntfile does not exist', () => {
+    it('should not be eligible', () => {
+      expect(builder.isEligable(directory)).toBe(false);
     });
   });
 });
