@@ -8,7 +8,8 @@ import { provideBuilder } from '../lib/grunt';
 
 describe('grunt provider', () => {
   let directory;
-  const builder = provideBuilder();
+  let builder;
+  const Builder = provideBuilder();
 
   const setupGrunt = () => {
     const binGrunt = path.join(directory, 'node_modules', '.bin', 'grunt');
@@ -27,7 +28,8 @@ describe('grunt provider', () => {
     waitsForPromise(() => {
       return vouch(temp.mkdir, 'atom-build-spec-')
         .then((dir) => vouch(fs.realpath, dir))
-        .then((dir) => (directory = `${dir}/`));
+        .then((dir) => directory = `${dir}/`)
+        .then((dir) => builder = new Builder(dir));
     });
   });
 
@@ -39,16 +41,15 @@ describe('grunt provider', () => {
     it('should be eligible', () => {
       fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/fixture/Gruntfile.js'));
       waitsForPromise(setupGrunt);
-      runs(() => {
-        expect(builder.isEligable(directory)).toBe(true);
-      });
+      runs(() => expect(builder.isEligible()).toBe(true));
     });
 
     it('should give targets as settings', () => {
       fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/fixture/Gruntfile.js'));
       waitsForPromise(setupGrunt);
       waitsForPromise(() => {
-        return builder.settings(directory).then((settings) => {
+        expect(builder.isEligible()).toBe(true);
+        return builder.settings().then((settings) => {
           expect(settings.length).toBe(3);
           const real = settings.map(s => s.name).sort();
           const expected = [ 'Grunt: default', 'Grunt: dev task', 'Grunt: other task' ];
@@ -66,7 +67,8 @@ describe('grunt provider', () => {
     it('should only contain default target if grunt is not installed', () => {
       fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/fixture/Gruntfile.js'));
       runs(() => {
-        builder.settings(directory).then((settings) => {
+        expect(builder.isEligible()).toBe(true);
+        builder.settings().then((settings) => {
           expect(settings.length).toBe(1);
           expect(settings[0].name).toEqual('Grunt: default');
         });
@@ -76,7 +78,7 @@ describe('grunt provider', () => {
 
   describe('when gruntfile does not exist', () => {
     it('should not be eligible', () => {
-      expect(builder.isEligable(directory)).toBe(false);
+      expect(builder.isEligible()).toBe(false);
     });
   });
 });
