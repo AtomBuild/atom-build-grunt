@@ -37,7 +37,7 @@ describe('grunt provider', () => {
     fs.removeSync(directory);
   });
 
-  describe('when gruntfile exists', () => {
+  describe('when Gruntfile.js exists', () => {
     it('should be eligible', () => {
       fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/fixture/Gruntfile.js'));
       waitsForPromise(setupGrunt);
@@ -66,6 +66,45 @@ describe('grunt provider', () => {
 
     it('should only contain default target if grunt is not installed', () => {
       fs.writeFileSync(directory + 'Gruntfile.js', fs.readFileSync(__dirname + '/fixture/Gruntfile.js'));
+      runs(() => {
+        expect(builder.isEligible()).toBe(true);
+        builder.settings().then((settings) => {
+          expect(settings.length).toBe(1);
+          expect(settings[0].name).toEqual('Grunt: default');
+        });
+      });
+    });
+  });
+
+  describe('when Gruntfile.coffee exists', () => {
+    it('should be eligible', () => {
+      fs.writeFileSync(directory + 'Gruntfile.coffee', fs.readFileSync(__dirname + '/fixture/Gruntfile.coffee'));
+      waitsForPromise(setupGrunt);
+      runs(() => expect(builder.isEligible()).toBe(true));
+    });
+
+    it('should give targets as settings', () => {
+      fs.writeFileSync(directory + 'Gruntfile.coffee', fs.readFileSync(__dirname + '/fixture/Gruntfile.coffee'));
+      waitsForPromise(setupGrunt);
+      waitsForPromise(() => {
+        expect(builder.isEligible()).toBe(true);
+        return builder.settings().then((settings) => {
+          expect(settings.length).toBe(3);
+          const real = settings.map(s => s.name).sort();
+          const expected = [ 'Grunt: default', 'Grunt: dev task', 'Grunt: other task' ];
+          expect(real).toEqual(expected);
+
+          // Inspect one target closely
+          const setting = settings.find(s => s.name === 'Grunt: dev task');
+          expect(setting.sh).toBe(false);
+          expect(setting.args).toEqual([ 'dev task' ]);
+          expect(setting.exec).toEqual(`${directory}node_modules/.bin/grunt`);
+        });
+      });
+    });
+
+    it('should only contain default target if grunt is not installed', () => {
+      fs.writeFileSync(directory + 'Gruntfile.coffee', fs.readFileSync(__dirname + '/fixture/Gruntfile.coffee'));
       runs(() => {
         expect(builder.isEligible()).toBe(true);
         builder.settings().then((settings) => {
